@@ -45,8 +45,26 @@ ensure_bucket_exists() {
     create_bucket
 }
 
+# VolRadar: the saved-trades subsystem (migration 109) runs FORCE ROW LEVEL SECURITY,
+# which subjects the table OWNER to RLS as well. pg_dump connects as that owner and runs
+# with row_security=off, so it fails closed rather than dumping a filtered subset.
+# It cannot be dumped, by design. Do NOT "fix" this with --enable-row-security: that
+# exits 0 having written ZERO rows for these tables, i.e. a green backup with no data.
+# The schema is excluded too: its policies and SECURITY DEFINER functions reference the
+# vr_saved_* roles, which pg_dump never emits (roles are cluster-level), so a dump
+# containing them would halt a psql restore run with ON_ERROR_STOP=1.
+# Disaster recovery for this subsystem = re-apply migration 109 (self-contained) and
+# provision the role passwords out of band. See docs/ops/DB-BACKUP-RUNBOOK.md.
+# Tables are listed EXPLICITLY, not user_saved_trade_*: a future FORCE-RLS table must
+# break this backup loudly instead of being dropped from it silently.
 pg_dump_database() {
-    pg_dump  --no-owner --no-privileges --clean --if-exists --quote-all-identifiers "$DATABASE_URL"
+    pg_dump  --no-owner --no-privileges --clean --if-exists --quote-all-identifiers \
+        --exclude-schema='saved_trades_20261019' \
+        --exclude-table='public.user_saved_trade_ideas' \
+        --exclude-table='public.user_saved_trade_operations' \
+        --exclude-table='public.user_saved_trade_deleted_owners' \
+        --exclude-table='public.user_saved_trade_maintenance' \
+        "$DATABASE_URL"
 }
 
 upload_to_bucket() {
@@ -58,6 +76,7 @@ upload_to_bucket() {
 main() {
     ensure_bucket_exists
     echo "Taking backup and uploading it to S3..."
+    echo "WARNING: Saved Trades excluded from this logical backup (FORCE RLS); covered by Render PITR only" >&2
     pg_dump_database | gzip | upload_to_bucket
     echo "Done."
 }
