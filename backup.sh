@@ -77,6 +77,7 @@ pg_dump_database() {
         --exclude-table='public.user_saved_trade_operations' \
         --exclude-table='public.user_saved_trade_deleted_owners' \
         --exclude-table='public.user_saved_trade_maintenance' \
+        --exclude-table='public.premium_logged_entries' \
         "$DATABASE_URL"
 }
 

@@ -242,6 +242,8 @@ check "no &> redirect" \
     "$(code_only | grep -q '&>' && echo 0 || echo 1)"
 check "shebang declares sh, not bash" \
     "$(head -1 "$HERE/backup.sh" | grep -qx '#!/bin/sh' && echo 1 || echo 0)"
+check "premium_logged_entries (FORCE RLS, migration 120) is excluded" \
+    "$(grep -q "exclude-table='public.premium_logged_entries'" "$HERE/backup.sh" && echo 1 || echo 0)"
 
 echo
 echo "passed: $PASS   failed: $FAIL"
